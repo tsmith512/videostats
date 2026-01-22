@@ -241,7 +241,7 @@ export function getDemoPage(videoId: string, workerUrl: string): string {
         <div class="main-card">
             <div class="video-wrapper">
                 <iframe
-                    src="https://customer-igynxd2rwhmuoxw8.cloudflarestream.com/${videoId}/iframe"
+                    src="https://customer-igynxd2rwhmuoxw8.cloudflarestream.com/${videoId}/iframe?preload=auto"
                     loading="lazy"
                     allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
                     allowfullscreen="true"
