@@ -1,5 +1,30 @@
 # Deployment History
 
+## Fix: Prevent Duplicate Analytics - January 21, 2026
+
+**Version ID:** 5506e5f0-3828-4806-9b5d-66438f2e3074
+
+### Problem Fixed
+- `player.played` is cumulative and read-only
+- Periodic flushing was sending the same ranges multiple times
+- Each flush incorrectly incremented bucket counts
+
+### Solution
+- Send analytics only once per session
+- Flush on `ended` event when video finishes
+- Flush on `beforeunload` when user leaves page
+- Use `hasSentData` flag to prevent duplicates
+
+### Changes
+- Updated demo page and simple example
+- Removed periodic `setInterval` flush
+- Added proper guard conditions
+
+### Bundle Size
+- **Size:** 20.71 KiB (5.46 KiB gzipped)
+
+---
+
 ## Update: Live Demo Page - January 21, 2026
 
 **Version ID:** 50bc3e8b-f416-48af-9653-ac90043f3231

@@ -120,37 +120,70 @@ The Stream Player (and HTML5 video elements) maintain a `played` property that i
 - `player.played.start(i)` - Start time of range i (in seconds)
 - `player.played.end(i)` - End time of range i (in seconds)
 
+**Important:** `player.played` is **cumulative and read-only**. It accumulates all watched ranges throughout the session and cannot be reset. This means you should only send the data **once per session** to avoid duplicate counting.
+
 Ranges are automatically merged when they overlap or are adjacent, so you'll typically see fewer ranges as the viewer watches more of the video.
 
 ## Integration Patterns
 
-### Pattern 1: Periodic Flush (Recommended)
-Send data every N seconds:
-```javascript
-setInterval(() => sendToAnalytics(extractRanges()), 10000);
-```
+### Pattern 1: End-of-Session Flush (Recommended) ⭐
 
-### Pattern 2: On Change
-Send data only when ranges change:
+Send data only when the session ends:
 ```javascript
-let lastRanges = [];
-player.addEventListener('timeupdate', () => {
-    const current = extractRanges();
-    if (JSON.stringify(current) !== JSON.stringify(lastRanges)) {
-        sendToAnalytics(current);
-        lastRanges = current;
+let hasSentData = false;
+
+// Send when video ends
+player.addEventListener('ended', () => {
+    sendToAnalytics(extractRanges());
+    hasSentData = true;
+});
+
+// Send when user leaves page
+window.addEventListener('beforeunload', () => {
+    if (!hasSentData) {
+        navigator.sendBeacon(endpoint, JSON.stringify({
+            videoId: videoId,
+            ranges: extractRanges()
+        }));
     }
 });
 ```
 
-### Pattern 3: Batched with Debounce
-Collect changes and send after inactivity:
+**Why this is recommended:**
+- `player.played` is cumulative - sending it multiple times causes duplicate counts
+- Ensures each viewing session is tracked exactly once
+- Uses `sendBeacon` for reliable delivery during page unload
+
+### Pattern 2: Periodic Flush (⚠️ Not Recommended for player.played)
+This pattern causes duplicate data with `player.played`:
 ```javascript
-let timeoutId;
+// DON'T DO THIS - causes duplicate counting
+setInterval(() => sendToAnalytics(extractRanges()), 10000);
+```
+
+### Pattern 3: Manual Range Tracking (Alternative)
+If you need periodic updates, track ranges manually instead of using `player.played`:
+```javascript
+let customRanges = [];
+let lastTime = null;
+
 player.addEventListener('timeupdate', () => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => sendToAnalytics(extractRanges()), 2000);
+    if (lastTime && player.currentTime > lastTime) {
+        customRanges.push({ 
+            startTime: lastTime, 
+            endTime: player.currentTime 
+        });
+    }
+    lastTime = player.currentTime;
 });
+
+// Flush and clear periodically
+setInterval(() => {
+    if (customRanges.length > 0) {
+        sendToAnalytics(customRanges);
+        customRanges = []; // Clear after sending
+    }
+}, 10000);
 ```
 
 ## Browser Compatibility
