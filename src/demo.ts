@@ -270,7 +270,7 @@ export function getDemoPage(videoId: string, workerUrl: string): string {
     <script src="https://embed.cloudflarestream.com/embed/sdk.latest.js"></script>
     <script>
         const ANALYTICS_ENDPOINT = '${workerUrl}';
-        const VIDEO_ID = 'demo-${videoId}-' + Date.now();
+        const VIDEO_ID = '${videoId}'; // Use actual Stream video ID for aggregation
 
         const player = Stream(document.getElementById('stream-player'));
         const watchedBar = document.getElementById('watched');
