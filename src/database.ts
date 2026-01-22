@@ -48,7 +48,7 @@ export async function getHistogram(
   videoId: string
 ): Promise<HistogramBucket[]> {
   const result = await db.prepare(`
-    SELECT bucket_start, view_count
+    SELECT bucket_start as bucketStart, view_count as viewCount
     FROM video_watch_buckets
     WHERE video_id = ?
     ORDER BY bucket_start ASC
