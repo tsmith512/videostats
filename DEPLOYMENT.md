@@ -1,5 +1,23 @@
 # Deployment History
 
+## Fix: Use Actual Video ID for Aggregation - January 21, 2026
+
+**Version ID:** aaa98143-ae50-4225-bc4a-095b52798c57
+
+### Problem Fixed
+- Demo was using `'demo-{videoId}-{timestamp}'` as VIDEO_ID
+- Timestamp made every page load unique, preventing aggregation
+- Analytics couldn't aggregate viewing patterns across sessions
+
+### Solution
+- Use actual Stream video ID: `849eebd185f7fd262589c09111911347`
+- All sessions for same video now aggregate correctly
+
+### Bundle Size
+- **Size:** 20.74 KiB (5.47 KiB gzipped)
+
+---
+
 ## Fix: Prevent Duplicate Analytics - January 21, 2026
 
 **Version ID:** 5506e5f0-3828-4806-9b5d-66438f2e3074
