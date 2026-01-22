@@ -1,5 +1,29 @@
 # Deployment History
 
+## Feature: Global Heatmap Visualization - January 21, 2026
+
+**Version ID:** cc3487bc-72bd-4776-90bb-f5cdcc0ad6cd
+
+### New Features
+- Added global heatmap showing aggregated viewing data from all sessions
+- Second progress bar below personal session progress
+- Color-coded segments: darker purple = more views
+- Fetches data from `/api/histogram/{videoId}` endpoint
+- Auto-refreshes every 30 seconds
+- Hover tooltips show time range and view counts
+- Updates after submitting new analytics
+
+### Design
+- HSL gradient from light to dark purple based on popularity
+- Each segment represents a 5-second bucket
+- Clear labels distinguish personal vs global data
+- Seamlessly integrated with existing purple theme
+
+### Bundle Size
+- **Size:** 24.29 KiB (6.24 KiB gzipped)
+
+---
+
 ## Fix: Use Actual Video ID for Aggregation - January 21, 2026
 
 **Version ID:** aaa98143-ae50-4225-bc4a-095b52798c57
