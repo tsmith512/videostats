@@ -310,19 +310,38 @@ export function getDemoPage(videoId: string, workerUrl: string): string {
         
         let hasSentData = false;
         let videoDuration = 0;
+        let initialized = false;
+
+        function initialize() {
+            if (initialized) return;
+            
+            if (player.duration && !isNaN(player.duration) && player.duration > 0) {
+                initialized = true;
+                videoDuration = player.duration;
+                showStatus('✓ Stream Player loaded successfully', 'success');
+                showStatus('📊 Analytics will be sent when video ends or page closes', 'info');
+                
+                // Load histogram data
+                loadHistogram();
+            }
+        }
 
         player.addEventListener('timeupdate', () => {
+            // Initialize on first timeupdate if not already initialized
+            if (!initialized) {
+                initialize();
+            }
             updateWatchedBar();
         });
 
         player.addEventListener('loadedmetadata', () => {
-            videoDuration = player.duration;
-            showStatus('✓ Stream Player loaded successfully', 'success');
-            showStatus('📊 Analytics will be sent when video ends or page closes', 'info');
-            
-            // Load histogram data
-            loadHistogram();
+            initialize();
         });
+
+        // Also try to initialize immediately in case player is already ready
+        setTimeout(() => {
+            initialize();
+        }, 100);
 
         // Send data when video ends
         player.addEventListener('ended', () => {
