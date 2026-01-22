@@ -67,6 +67,8 @@ Visit the live demo to see the analytics system in action with an embedded Cloud
 
 **Examples:**
 - Default: `https://videostats.tsmithcreative.workers.dev/demo`
+- Big Buck Bunny: `https://videostats.tsmithcreative.workers.dev/demo/849eebd185f7fd262589c09111911347`
+- Sintel: `https://videostats.tsmithcreative.workers.dev/demo/46c8b7f480d410840758c1cb14a72e47`
 - Custom: `https://videostats.tsmithcreative.workers.dev/demo/YOUR_VIDEO_ID`
 
 ### Track Video Views
