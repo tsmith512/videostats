@@ -66,10 +66,10 @@ Visit the live demo to see the analytics system in action with an embedded Cloud
 - Beautiful gradient UI
 
 **Examples:**
-- Default: `https://videostats.tsmithcreative.workers.dev/demo`
-- Big Buck Bunny: `https://videostats.tsmithcreative.workers.dev/demo/849eebd185f7fd262589c09111911347`
-- Sintel: `https://videostats.tsmithcreative.workers.dev/demo/46c8b7f480d410840758c1cb14a72e47`
-- Custom: `https://videostats.tsmithcreative.workers.dev/demo/YOUR_VIDEO_ID`
+- Tulsa Halloween 2025 (default): `https://videostats.tsmithcreative.workers.dev/demo`
+- Push Start Maserati: `https://videostats.tsmithcreative.workers.dev/demo/43c6d266d966358dd90bd0430749216f`
+- Rock Climbing: `https://videostats.tsmithcreative.workers.dev/demo/3c3cbd48f0527fa4f1ed425c2abcf91f`
+- Re:Invent Trip Report: `https://videostats.tsmithcreative.workers.dev/demo/30b87aa298d574589d2d4a3b784ace80`
 
 ### Track Video Views
 
