@@ -259,7 +259,7 @@ export function getDemoPage(videoId: string, workerUrl: string): string {
             <h2>How It Works</h2>
             <ul>
                 <li>The Stream Player tracks which parts of the video you watch</li>
-                <li>Every 10 seconds, viewing data is sent to the analytics endpoint</li>
+                <li>Viewing data is sent when the video ends or you leave the page</li>
                 <li>Data is aggregated into 5-second buckets for efficient storage</li>
                 <li>Each viewing session increments the video's <code>total_views</code> counter</li>
                 <li>Try seeking around the video and watch the progress bar update!</li>
@@ -271,13 +271,11 @@ export function getDemoPage(videoId: string, workerUrl: string): string {
     <script>
         const ANALYTICS_ENDPOINT = '${workerUrl}';
         const VIDEO_ID = 'demo-${videoId}-' + Date.now();
-        const FLUSH_INTERVAL = 10000;
 
         const player = Stream(document.getElementById('stream-player'));
         const watchedBar = document.getElementById('watched');
         
-        let flushCount = 0;
-        let lastSentRanges = [];
+        let hasSentData = false;
 
         player.addEventListener('timeupdate', () => {
             updateWatchedBar();
@@ -285,6 +283,13 @@ export function getDemoPage(videoId: string, workerUrl: string): string {
 
         player.addEventListener('loadedmetadata', () => {
             showStatus('✓ Stream Player loaded successfully', 'success');
+            showStatus('📊 Analytics will be sent when video ends or page closes', 'info');
+        });
+
+        // Send data when video ends
+        player.addEventListener('ended', () => {
+            showStatus('🎬 Video ended - sending analytics...', 'info');
+            sendToAnalytics();
         });
 
         function updateWatchedBar() {
@@ -325,9 +330,14 @@ export function getDemoPage(videoId: string, workerUrl: string): string {
         }
 
         async function sendToAnalytics() {
+            if (hasSentData) {
+                return; // Only send once per session
+            }
+
             const ranges = extractRanges();
             
-            if (ranges.length === 0 || JSON.stringify(ranges) === JSON.stringify(lastSentRanges)) {
+            if (ranges.length === 0) {
+                showStatus('ℹ️ No ranges to send', 'info');
                 return;
             }
 
@@ -347,10 +357,9 @@ export function getDemoPage(videoId: string, workerUrl: string): string {
                     throw new Error(data.error || 'Failed to track views');
                 }
 
-                flushCount++;
-                lastSentRanges = ranges;
+                hasSentData = true;
                 
-                document.getElementById('flushCount').textContent = flushCount;
+                document.getElementById('flushCount').textContent = '1';
                 document.getElementById('bucketCount').textContent = data.bucketsUpdated;
                 
                 showStatus(\`✓ Sent \${ranges.length} ranges, updated \${data.bucketsUpdated} buckets\`, 'success');
@@ -374,15 +383,23 @@ export function getDemoPage(videoId: string, workerUrl: string): string {
             }
         }
 
-        setInterval(sendToAnalytics, FLUSH_INTERVAL);
-
+        // Send data when page unloads (if not already sent)
         window.addEventListener('beforeunload', () => {
+            if (hasSentData) {
+                return;
+            }
+            
             const ranges = extractRanges();
             if (ranges.length > 0) {
-                navigator.sendBeacon(
+                // Use sendBeacon for reliable delivery during page unload
+                const success = navigator.sendBeacon(
                     \`\${ANALYTICS_ENDPOINT}/api/track\`,
                     JSON.stringify({ videoId: VIDEO_ID, ranges })
                 );
+                
+                if (success) {
+                    hasSentData = true;
+                }
             }
         });
     </script>

@@ -150,9 +150,8 @@
 
     <div class="info-box">
         <strong>How it works:</strong> This demo uses the Stream Player's <code>player.played</code> TimeRanges 
-        to track which parts of the video you've watched. Every 10 seconds, it sends these ranges to the 
-        analytics endpoint at <code>https://videostats.tsmithcreative.workers.dev</code>. Try seeking around 
-        the video and watch the progress bar update!
+        to track which parts of the video you've watched. Analytics are sent when the video ends or when you 
+        leave the page. Try seeking around the video and watch the progress bar update!
     </div>
 
     <script src="https://embed.cloudflarestream.com/embed/sdk.latest.js"></script>
@@ -160,18 +159,22 @@
         // Configuration
         const ANALYTICS_ENDPOINT = 'https://videostats.tsmithcreative.workers.dev';
         const VIDEO_ID = 'stream-demo-' + Date.now(); // Unique ID for this session
-        const FLUSH_INTERVAL = 10000; // Send data every 10 seconds
 
         // Initialize Stream Player
         const player = Stream(document.getElementById('stream-player'));
         const watchedBar = document.getElementById('watched');
         
-        let flushCount = 0;
-        let lastSentRanges = [];
+        let hasSentData = false;
 
         // Update visualization and stats on every timeupdate
         player.addEventListener('timeupdate', () => {
             updateWatchedBar();
+        });
+
+        // Send data when video ends
+        player.addEventListener('ended', () => {
+            showStatus('Video ended - sending analytics...');
+            sendToAnalytics();
         });
 
         function updateWatchedBar() {
@@ -212,10 +215,13 @@
 
         // Send ranges to analytics endpoint
         async function sendToAnalytics() {
+            if (hasSentData) {
+                return; // Only send once per session
+            }
+
             const ranges = extractRanges();
             
-            // Don't send if nothing has changed
-            if (ranges.length === 0 || JSON.stringify(ranges) === JSON.stringify(lastSentRanges)) {
+            if (ranges.length === 0) {
                 return;
             }
 
@@ -235,11 +241,9 @@
                     throw new Error(data.error || 'Failed to track views');
                 }
 
-                // Update stats
-                flushCount++;
-                lastSentRanges = ranges;
+                hasSentData = true;
                 
-                document.getElementById('flushCount').textContent = flushCount;
+                document.getElementById('flushCount').textContent = '1';
                 document.getElementById('bucketCount').textContent = data.bucketsUpdated;
                 
                 showStatus(`✓ Sent ${ranges.length} ranges, updated ${data.bucketsUpdated} buckets`);
@@ -262,24 +266,29 @@
             setTimeout(() => status.remove(), 5000);
         }
 
-        // Periodically send data to analytics
-        setInterval(sendToAnalytics, FLUSH_INTERVAL);
-
-        // Send remaining data when page unloads
+        // Send data when page unloads (if not already sent)
         window.addEventListener('beforeunload', () => {
+            if (hasSentData) {
+                return;
+            }
+            
             const ranges = extractRanges();
             if (ranges.length > 0) {
                 // Use sendBeacon for reliable unload tracking
-                navigator.sendBeacon(
+                const success = navigator.sendBeacon(
                     `${ANALYTICS_ENDPOINT}/api/track`,
                     JSON.stringify({ videoId: VIDEO_ID, ranges })
                 );
+                
+                if (success) {
+                    hasSentData = true;
+                }
             }
         });
 
         // Show initial message
         player.addEventListener('loadedmetadata', () => {
-            showStatus('Analytics tracking started. Play the video to begin!');
+            showStatus('Analytics tracking started. Data will be sent when video ends or page closes.');
         });
     </script>
 </body>
