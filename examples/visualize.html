@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Analytics Visualization</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            margin-top: 0;
+        }
+        .config {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        label {
+            font-weight: 600;
+        }
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100%;
+        }
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0052a3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin: 20px 0;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: 700;
+            color: #0066cc;
+        }
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #0066cc;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Video Watch Analytics Visualization</h1>
+        
+        <div class="config">
+            <label for="apiEndpoint">API Endpoint:</label>
+            <input type="text" id="apiEndpoint" value="http://localhost:8787">
+            
+            <label for="videoId">Video ID:</label>
+            <input type="text" id="videoId" value="" placeholder="Enter video ID">
+        </div>
+
+        <div>
+            <button onclick="loadData()" id="loadBtn">Load Data</button>
+            <button onclick="startAutoRefresh()" id="autoRefreshBtn">Auto Refresh (5s)</button>
+            <button onclick="stopAutoRefresh()" id="stopRefreshBtn" disabled>Stop Auto Refresh</button>
+        </div>
+
+        <div id="statusContainer"></div>
+
+        <div class="stats-grid" id="statsGrid" style="display: none;">
+            <div class="stat-card">
+                <div class="stat-value" id="totalBuckets">0</div>
+                <div class="stat-label">Total Buckets</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalViews">0</div>
+                <div class="stat-label">Total Views</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="maxViews">0</div>
+                <div class="stat-label">Peak Views</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="videoDuration">0:00</div>
+                <div class="stat-label">Video Duration</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>View Count by Time</h2>
+        <div class="chart-container">
+            <canvas id="histogramChart"></canvas>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Retention Analysis</h2>
+        <div class="chart-container">
+            <canvas id="retentionChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let histogramChart = null;
+        let retentionChart = null;
+        let autoRefreshInterval = null;
+
+        function showStatus(message, type) {
+            const container = document.getElementById('statusContainer');
+            const status = document.createElement('div');
+            status.className = `status ${type}`;
+            status.textContent = message;
+            container.appendChild(status);
+            setTimeout(() => status.remove(), 5000);
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        async function loadData() {
+            const apiEndpoint = document.getElementById('apiEndpoint').value;
+            const videoId = document.getElementById('videoId').value;
+
+            if (!videoId) {
+                showStatus('Please enter a video ID', 'error');
+                return;
+            }
+
+            const loadBtn = document.getElementById('loadBtn');
+            loadBtn.disabled = true;
+            loadBtn.innerHTML = '<span class="loading"></span> Loading...';
+
+            try {
+                const response = await fetch(`${apiEndpoint}/api/histogram/${videoId}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to load data');
+                }
+
+                if (data.buckets.length === 0) {
+                    showStatus('No data available for this video yet', 'error');
+                    return;
+                }
+
+                renderCharts(data);
+                updateStats(data);
+                document.getElementById('statsGrid').style.display = 'grid';
+                showStatus('Data loaded successfully', 'success');
+
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+                console.error('Error loading data:', error);
+            } finally {
+                loadBtn.disabled = false;
+                loadBtn.textContent = 'Load Data';
+            }
+        }
+
+        function renderCharts(data) {
+            const labels = data.buckets.map(b => formatTime(b.bucketStart));
+            const viewCounts = data.buckets.map(b => b.viewCount);
+
+            // Histogram Chart
+            const histogramCtx = document.getElementById('histogramChart').getContext('2d');
+            if (histogramChart) {
+                histogramChart.destroy();
+            }
+            histogramChart = new Chart(histogramCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'View Count',
+                        data: viewCounts,
+                        backgroundColor: 'rgba(0, 102, 204, 0.6)',
+                        borderColor: 'rgba(0, 102, 204, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Views'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time (MM:SS)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        title: {
+                            display: true,
+                            text: 'Viewing Pattern Histogram'
+                        }
+                    }
+                }
+            });
+
+            // Retention Chart (percentage of first bucket)
+            const firstBucketViews = viewCounts[0] || 1;
+            const retentionData = viewCounts.map(count => (count / firstBucketViews) * 100);
+
+            const retentionCtx = document.getElementById('retentionChart').getContext('2d');
+            if (retentionChart) {
+                retentionChart.destroy();
+            }
+            retentionChart = new Chart(retentionCtx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Retention %',
+                        data: retentionData,
+                        backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                        borderColor: 'rgba(40, 167, 69, 1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Retention (%)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time (MM:SS)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        title: {
+                            display: true,
+                            text: 'Viewer Retention Over Time'
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateStats(data) {
+            const totalBuckets = data.buckets.length;
+            const totalViews = data.buckets.reduce((sum, b) => sum + b.viewCount, 0);
+            const maxViews = Math.max(...data.buckets.map(b => b.viewCount));
+            const lastBucket = data.buckets[data.buckets.length - 1];
+            const duration = lastBucket ? lastBucket.bucketStart + 5 : 0;
+
+            document.getElementById('totalBuckets').textContent = totalBuckets;
+            document.getElementById('totalViews').textContent = totalViews.toLocaleString();
+            document.getElementById('maxViews').textContent = maxViews.toLocaleString();
+            document.getElementById('videoDuration').textContent = formatTime(duration);
+        }
+
+        function startAutoRefresh() {
+            if (autoRefreshInterval) return;
+            
+            autoRefreshInterval = setInterval(loadData, 5000);
+            document.getElementById('autoRefreshBtn').disabled = true;
+            document.getElementById('stopRefreshBtn').disabled = false;
+            showStatus('Auto-refresh enabled (every 5 seconds)', 'success');
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                document.getElementById('autoRefreshBtn').disabled = false;
+                document.getElementById('stopRefreshBtn').disabled = true;
+                showStatus('Auto-refresh disabled', 'success');
+            }
+        }
+
+        // Load data on Enter key
+        document.getElementById('videoId').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                loadData();
+            }
+        });
+    </script>
+</body>
+</html>

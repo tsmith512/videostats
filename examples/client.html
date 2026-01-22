@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Analytics Client Example</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        video {
+            width: 100%;
+            max-width: 800px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0052a3;
+        }
+        .stats {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .stats h3 {
+            margin-top: 0;
+        }
+        pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Video Watch Analytics - Client Example</h1>
+        
+        <div class="config">
+            <label for="apiEndpoint">API Endpoint:</label>
+            <input type="text" id="apiEndpoint" value="http://localhost:8787" style="width: 400px; padding: 8px;">
+        </div>
+
+        <video id="videoPlayer" controls>
+            <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+
+        <div class="controls">
+            <button onclick="tracker.flush()">Flush Data Now</button>
+            <button onclick="loadHistogram()">Load Histogram</button>
+            <button onclick="clearStatus()">Clear Status</button>
+        </div>
+
+        <div class="stats">
+            <h3>Tracking Statistics</h3>
+            <div id="stats">
+                <p>Ranges queued: <strong id="rangesQueued">0</strong></p>
+                <p>Last flush: <strong id="lastFlush">Never</strong></p>
+                <p>Total flushes: <strong id="totalFlushes">0</strong></p>
+            </div>
+        </div>
+
+        <div id="statusContainer"></div>
+
+        <div class="stats">
+            <h3>Current Histogram</h3>
+            <pre id="histogram">No data loaded. Click "Load Histogram" to fetch.</pre>
+        </div>
+
+        <div class="stats">
+            <h3>Implementation Code</h3>
+            <pre id="code">// See the tracker implementation below in the page source</pre>
+        </div>
+    </div>
+
+    <script>
+        // Video Watch Tracker Implementation
+        class ViewTracker {
+            constructor(videoId, apiEndpoint, flushInterval = 10000) {
+                this.videoId = videoId;
+                this.apiEndpoint = apiEndpoint;
+                this.ranges = [];
+                this.flushInterval = flushInterval;
+                this.lastTime = null;
+                this.totalFlushes = 0;
+                this.startFlushTimer();
+                
+                console.log(`ViewTracker initialized for video: ${videoId}`);
+            }
+            
+            addRange(startTime, endTime) {
+                if (startTime >= endTime || startTime < 0) return;
+                
+                this.ranges.push({ startTime, endTime });
+                this.updateStats();
+                console.log(`Added range: ${startTime.toFixed(2)}s - ${endTime.toFixed(2)}s`);
+            }
+            
+            async flush() {
+                if (this.ranges.length === 0) {
+                    this.showStatus('No ranges to flush', 'success');
+                    return;
+                }
+                
+                const rangesToSend = [...this.ranges];
+                this.ranges = [];
+                this.updateStats();
+                
+                try {
+                    const response = await fetch(`${this.apiEndpoint}/api/track`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            videoId: this.videoId,
+                            ranges: rangesToSend
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Failed to track views');
+                    }
+                    
+                    this.totalFlushes++;
+                    document.getElementById('lastFlush').textContent = new Date().toLocaleTimeString();
+                    document.getElementById('totalFlushes').textContent = this.totalFlushes;
+                    
+                    this.showStatus(
+                        `Successfully tracked ${rangesToSend.length} ranges, updated ${data.bucketsUpdated} buckets`, 
+                        'success'
+                    );
+                    
+                    console.log('Flush successful:', data);
+                    
+                } catch (error) {
+                    // Put ranges back if flush failed
+                    this.ranges = [...rangesToSend, ...this.ranges];
+                    this.updateStats();
+                    
+                    this.showStatus(`Error: ${error.message}`, 'error');
+                    console.error('Flush error:', error);
+                }
+            }
+            
+            startFlushTimer() {
+                setInterval(() => this.flush(), this.flushInterval);
+                console.log(`Auto-flush enabled every ${this.flushInterval}ms`);
+            }
+            
+            updateStats() {
+                document.getElementById('rangesQueued').textContent = this.ranges.length;
+            }
+            
+            showStatus(message, type) {
+                const container = document.getElementById('statusContainer');
+                const status = document.createElement('div');
+                status.className = `status ${type}`;
+                status.textContent = message;
+                container.appendChild(status);
+                
+                // Auto-remove after 5 seconds
+                setTimeout(() => status.remove(), 5000);
+            }
+        }
+
+        // Initialize tracker
+        const videoId = 'example-video-' + Date.now();
+        const apiEndpoint = document.getElementById('apiEndpoint').value;
+        const tracker = new ViewTracker(videoId, apiEndpoint, 10000);
+
+        // Attach to video player
+        const video = document.getElementById('videoPlayer');
+        let lastTime = null;
+
+        video.addEventListener('timeupdate', () => {
+            const currentTime = video.currentTime;
+            
+            if (lastTime !== null && currentTime > lastTime) {
+                // Normal playback
+                tracker.addRange(lastTime, currentTime);
+            }
+            
+            lastTime = currentTime;
+        });
+
+        video.addEventListener('seeking', () => {
+            // Reset tracking when user seeks
+            lastTime = null;
+        });
+
+        video.addEventListener('seeked', () => {
+            // Resume tracking after seek
+            lastTime = video.currentTime;
+        });
+
+        // Flush on page unload
+        window.addEventListener('beforeunload', () => {
+            tracker.flush();
+        });
+
+        // Load histogram function
+        async function loadHistogram() {
+            try {
+                const apiEndpoint = document.getElementById('apiEndpoint').value;
+                const response = await fetch(`${apiEndpoint}/api/histogram/${videoId}`);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to load histogram');
+                }
+                
+                document.getElementById('histogram').textContent = JSON.stringify(data, null, 2);
+                tracker.showStatus(`Loaded histogram with ${data.buckets.length} buckets`, 'success');
+                
+            } catch (error) {
+                tracker.showStatus(`Error loading histogram: ${error.message}`, 'error');
+                console.error('Histogram error:', error);
+            }
+        }
+
+        function clearStatus() {
+            document.getElementById('statusContainer').innerHTML = '';
+        }
+
+        // Update code display
+        document.getElementById('code').textContent = `
+// Initialize the tracker
+const tracker = new ViewTracker(
+    'video-123',           // Video ID
+    'https://your-worker.workers.dev',  // API endpoint
+    10000                  // Flush interval (10 seconds)
+);
+
+// Track playback in your video player
+video.addEventListener('timeupdate', () => {
+    const currentTime = video.currentTime;
+    if (lastTime !== null && currentTime > lastTime) {
+        tracker.addRange(lastTime, currentTime);
+    }
+    lastTime = currentTime;
+});
+
+// Flush on page unload
+window.addEventListener('beforeunload', () => tracker.flush());
+        `.trim();
+    </script>
+</body>
+</html>

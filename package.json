@@ -1,0 +1,20 @@
+{
+  "name": "videostats",
+  "version": "1.0.0",
+  "description": "A Cloudflare Worker-based solution for tracking and aggregating video viewing patterns using time-bucketed histograms.",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "type-check": "tsc --noEmit",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["cloudflare", "workers", "video", "analytics", "d1"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260122.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.47.0"
+  }
+}
