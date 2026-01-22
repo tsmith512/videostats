@@ -3,11 +3,10 @@ main = "src/index.ts"
 compatibility_date = "2024-01-01"
 
 # D1 Database binding
-# After creating your D1 database, update the database_id below
 [[d1_databases]]
 binding = "DB"
-database_name = "videostats-db"
-database_id = "YOUR_DATABASE_ID"  # Replace with actual database ID after running: wrangler d1 create videostats-db
+database_name = "videostats-prod-db"
+database_id = "879c076d-0ae5-4e8c-92d9-20e69de4304f"
 
 # Uncomment to enable local development with D1
 # [env.dev]
