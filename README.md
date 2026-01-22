@@ -51,16 +51,23 @@ CREATE TABLE videos (
 
 ### Live Demo
 
-**Endpoint:** `GET /demo`
+**Endpoints:** 
+- `GET /demo` - Demo with default video
+- `GET /demo/:videoId` - Demo with custom Stream video
 
 Visit the live demo to see the analytics system in action with an embedded Cloudflare Stream video. The demo automatically tracks viewing patterns and displays real-time statistics.
 
 **Features:**
 - Embedded Cloudflare Stream Player
-- Real-time progress visualization
+- Real-time progress visualization (your session)
+- Global heatmap (all viewers, color-coded by popularity)
 - Live statistics (segments, coverage, uploads, buckets)
 - Activity log showing tracking events
 - Beautiful gradient UI
+
+**Examples:**
+- Default: `https://videostats.tsmithcreative.workers.dev/demo`
+- Custom: `https://videostats.tsmithcreative.workers.dev/demo/YOUR_VIDEO_ID`
 
 ### Track Video Views
 
