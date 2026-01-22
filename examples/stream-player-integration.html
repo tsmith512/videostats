@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Player Analytics Integration</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            margin-top: 0;
+        }
+        .config {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        label {
+            font-weight: 600;
+        }
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100%;
+        }
+        .video-wrapper {
+            position: relative;
+            padding-top: 56.25%;
+            margin-bottom: 20px;
+        }
+        iframe {
+            border: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 100%;
+            border-radius: 4px;
+        }
+        #watched {
+            position: relative;
+            background: #eee;
+            height: 2rem;
+            width: 100%;
+            margin: 1rem 0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        #watched div {
+            position: absolute;
+            background: #088288;
+            height: 100%;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #0066cc;
+        }
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0052a3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 0.9em;
+        }
+        .range-list {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+        .range-item {
+            padding: 4px 0;
+            border-bottom: 1px solid #ddd;
+        }
+        .range-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Cloudflare Stream Player + Video Analytics</h1>
+        
+        <div class="config">
+            <label for="apiEndpoint">Analytics API:</label>
+            <input type="text" id="apiEndpoint" value="https://videostats.tsmithcreative.workers.dev">
+            
+            <label for="videoId">Video ID:</label>
+            <input type="text" id="videoId" value="stream-demo-video" placeholder="Unique identifier for this video">
+            
+            <label for="flushInterval">Flush Interval (ms):</label>
+            <input type="number" id="flushInterval" value="10000" min="1000" step="1000">
+        </div>
+
+        <button onclick="initializeTracking()">Start Tracking</button>
+        <button onclick="manualFlush()">Flush Now</button>
+        <button onclick="resetStats()">Reset Stats</button>
+
+        <div id="statusContainer"></div>
+    </div>
+
+    <div class="container">
+        <h2>Video Player</h2>
+        
+        <div class="video-wrapper">
+            <iframe
+                src="https://customer-igynxd2rwhmuoxw8.cloudflarestream.com/46c8b7f480d410840758c1cb14a72e47/iframe?poster=https%3A%2F%2Fcustomer-igynxd2rwhmuoxw8.cloudflarestream.com%2F46c8b7f480d410840758c1cb14a72e47%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600"
+                loading="lazy"
+                allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+                allowfullscreen="true"
+                id="stream-player"
+            ></iframe>
+        </div>
+
+        <h3>Watched Ranges (Current Session)</h3>
+        <div id="watched"></div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="rangeCount">0</div>
+                <div class="stat-label">Active Ranges</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="coveragePercent">0%</div>
+                <div class="stat-label">Coverage</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="pendingRanges">0</div>
+                <div class="stat-label">Pending Upload</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalFlushes">0</div>
+                <div class="stat-label">Flushes Sent</div>
+            </div>
+        </div>
+
+        <h3>Tracked Ranges (To Be Sent)</h3>
+        <div class="range-list" id="rangeList">
+            <em>No ranges tracked yet. Play the video to start.</em>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>How It Works</h2>
+        <p>This example demonstrates how to integrate Cloudflare Stream Player with the Video Analytics Worker:</p>
+        <ol>
+            <li><strong>Access Played Ranges:</strong> Uses the Stream Player API's <code>player.played</code> TimeRanges property</li>
+            <li><strong>Extract Ranges:</strong> Loops through <code>player.played.start(i)</code> and <code>player.played.end(i)</code></li>
+            <li><strong>Track Changes:</strong> Monitors the <code>timeupdate</code> event to detect new played ranges</li>
+            <li><strong>Batch Upload:</strong> Periodically sends all ranges to the analytics endpoint</li>
+            <li><strong>Visual Feedback:</strong> Shows real-time progress bar and statistics</li>
+        </ol>
+
+        <h3>Implementation</h3>
+        <pre id="codeSnippet">
+// Initialize Stream Player
+const player = Stream(document.getElementById('stream-player'));
+
+// Track ranges on each timeupdate
+player.addEventListener('timeupdate', () => {
+    const ranges = [];
+    
+    // Extract all played ranges from the player
+    for (let i = 0; i &lt; player.played.length; i++) {
+        ranges.push({
+            startTime: player.played.start(i),
+            endTime: player.played.end(i)
+        });
+    }
+    
+    // Store for batch upload
+    trackRanges(ranges);
+});
+
+// Periodically flush to analytics API
+setInterval(() => {
+    sendToAnalytics(videoId, ranges);
+}, 10000);
+        </pre>
+    </div>
+
+    <script src="https://embed.cloudflarestream.com/embed/sdk.latest.js"></script>
+    <script>
+        let player = null;
+        let trackingEnabled = false;
+        let lastRanges = [];
+        let pendingRanges = [];
+        let totalFlushes = 0;
+        let flushIntervalId = null;
+
+        function showStatus(message, type = 'info') {
+            const container = document.getElementById('statusContainer');
+            const status = document.createElement('div');
+            status.className = `status ${type}`;
+            status.textContent = message;
+            container.appendChild(status);
+            setTimeout(() => status.remove(), 5000);
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = (seconds % 60).toFixed(1);
+            return `${mins}:${secs.padStart(4, '0')}`;
+        }
+
+        function initializeTracking() {
+            if (trackingEnabled) {
+                showStatus('Tracking is already enabled', 'info');
+                return;
+            }
+
+            const videoId = document.getElementById('videoId').value;
+            if (!videoId) {
+                showStatus('Please enter a Video ID', 'error');
+                return;
+            }
+
+            // Initialize Stream Player
+            player = Stream(document.getElementById('stream-player'));
+            
+            // Wait for player to be ready
+            player.addEventListener('loadedmetadata', () => {
+                showStatus('Stream Player loaded successfully', 'success');
+            });
+
+            // Track played ranges on timeupdate
+            player.addEventListener('timeupdate', () => {
+                if (!trackingEnabled) return;
+                
+                updateWatchedBar();
+                extractAndTrackRanges();
+            });
+
+            // Start periodic flush
+            const flushInterval = parseInt(document.getElementById('flushInterval').value);
+            flushIntervalId = setInterval(flushToAnalytics, flushInterval);
+
+            trackingEnabled = true;
+            showStatus(`Tracking started (flush every ${flushInterval}ms)`, 'success');
+        }
+
+        function updateWatchedBar() {
+            const watchedBar = document.getElementById('watched');
+            watchedBar.innerHTML = '';
+
+            if (!player || !player.played) return;
+
+            // Loop through the played ranges and visualize them
+            for (let i = 0; i < player.played.length; i++) {
+                const block = document.createElement('div');
+                
+                // Start time as a percentage of video duration
+                const startPercent = (player.played.start(i) / player.duration) * 100;
+                block.style.left = `${startPercent}%`;
+
+                // End time as a percentage of video duration
+                const endPercent = (player.played.end(i) / player.duration) * 100;
+                block.style.right = `${100 - endPercent}%`;
+
+                watchedBar.appendChild(block);
+            }
+
+            // Update stats
+            document.getElementById('rangeCount').textContent = player.played.length;
+            
+            // Calculate coverage percentage
+            let totalWatched = 0;
+            for (let i = 0; i < player.played.length; i++) {
+                totalWatched += player.played.end(i) - player.played.start(i);
+            }
+            const coverage = player.duration > 0 ? (totalWatched / player.duration) * 100 : 0;
+            document.getElementById('coveragePercent').textContent = coverage.toFixed(1) + '%';
+        }
+
+        function extractAndTrackRanges() {
+            if (!player || !player.played) return;
+
+            const currentRanges = [];
+            
+            // Extract all played ranges from the player
+            for (let i = 0; i < player.played.length; i++) {
+                currentRanges.push({
+                    startTime: player.played.start(i),
+                    endTime: player.played.end(i)
+                });
+            }
+
+            // Check if ranges have changed (to avoid duplicate tracking)
+            const rangesChanged = JSON.stringify(currentRanges) !== JSON.stringify(lastRanges);
+            
+            if (rangesChanged) {
+                // Store the new ranges for upload
+                pendingRanges = currentRanges;
+                lastRanges = currentRanges;
+                
+                updateRangeList();
+            }
+        }
+
+        function updateRangeList() {
+            const rangeList = document.getElementById('rangeList');
+            
+            if (pendingRanges.length === 0) {
+                rangeList.innerHTML = '<em>No ranges tracked yet. Play the video to start.</em>';
+            } else {
+                rangeList.innerHTML = pendingRanges.map((range, i) => 
+                    `<div class="range-item">Range ${i + 1}: ${formatTime(range.startTime)} → ${formatTime(range.endTime)}</div>`
+                ).join('');
+            }
+            
+            document.getElementById('pendingRanges').textContent = pendingRanges.length;
+        }
+
+        async function flushToAnalytics() {
+            if (pendingRanges.length === 0) {
+                return;
+            }
+
+            const apiEndpoint = document.getElementById('apiEndpoint').value;
+            const videoId = document.getElementById('videoId').value;
+
+            try {
+                const response = await fetch(`${apiEndpoint}/api/track`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        videoId: videoId,
+                        ranges: pendingRanges
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to track views');
+                }
+
+                totalFlushes++;
+                document.getElementById('totalFlushes').textContent = totalFlushes;
+                
+                showStatus(
+                    `✓ Sent ${pendingRanges.length} ranges, updated ${data.bucketsUpdated} buckets`, 
+                    'success'
+                );
+
+                // Clear pending ranges after successful upload
+                // Note: We keep tracking new changes, don't clear lastRanges
+                
+            } catch (error) {
+                showStatus(`✗ Upload failed: ${error.message}`, 'error');
+                console.error('Flush error:', error);
+            }
+        }
+
+        function manualFlush() {
+            if (!trackingEnabled) {
+                showStatus('Please start tracking first', 'error');
+                return;
+            }
+            
+            flushToAnalytics();
+        }
+
+        function resetStats() {
+            lastRanges = [];
+            pendingRanges = [];
+            totalFlushes = 0;
+            document.getElementById('totalFlushes').textContent = '0';
+            document.getElementById('pendingRanges').textContent = '0';
+            updateRangeList();
+            showStatus('Statistics reset', 'info');
+        }
+
+        // Flush on page unload
+        window.addEventListener('beforeunload', () => {
+            if (trackingEnabled && pendingRanges.length > 0) {
+                // Use sendBeacon for reliable unload tracking
+                const apiEndpoint = document.getElementById('apiEndpoint').value;
+                const videoId = document.getElementById('videoId').value;
+                
+                navigator.sendBeacon(
+                    `${apiEndpoint}/api/track`,
+                    JSON.stringify({
+                        videoId: videoId,
+                        ranges: pendingRanges
+                    })
+                );
+            }
+        });
+    </script>
+</body>
+</html>

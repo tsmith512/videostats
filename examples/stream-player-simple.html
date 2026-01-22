@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Player Analytics - Simple Example</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        
+        .video-wrapper {
+            position: relative;
+            padding-top: 56.25%;
+            margin-bottom: 20px;
+        }
+        
+        iframe {
+            border: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 100%;
+            border-radius: 4px;
+        }
+        
+        #watched {
+            position: relative;
+            background: #eee;
+            height: 2rem;
+            width: 100%;
+            margin: 2rem 0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        #watched div {
+            position: absolute;
+            background: #088288;
+            height: 100%;
+        }
+        
+        .info-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            border-left: 4px solid #088288;
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .stat {
+            flex: 1;
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #088288;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        code {
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>Cloudflare Stream Analytics</h1>
+    <p class="subtitle">
+        Automatically track viewing patterns using the Stream Player API and send them to your analytics endpoint.
+    </p>
+
+    <div class="video-wrapper">
+        <iframe
+            src="https://customer-igynxd2rwhmuoxw8.cloudflarestream.com/46c8b7f480d410840758c1cb14a72e47/iframe?poster=https%3A%2F%2Fcustomer-igynxd2rwhmuoxw8.cloudflarestream.com%2F46c8b7f480d410840758c1cb14a72e47%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600"
+            loading="lazy"
+            allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+            allowfullscreen="true"
+            id="stream-player"
+        ></iframe>
+    </div>
+
+    <h3>Watched Ranges</h3>
+    <div id="watched"></div>
+
+    <div class="stats">
+        <div class="stat">
+            <div class="stat-value" id="rangeCount">0</div>
+            <div class="stat-label">Segments</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="flushCount">0</div>
+            <div class="stat-label">Uploads</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="bucketCount">0</div>
+            <div class="stat-label">Buckets</div>
+        </div>
+    </div>
+
+    <div id="statusContainer"></div>
+
+    <div class="info-box">
+        <strong>How it works:</strong> This demo uses the Stream Player's <code>player.played</code> TimeRanges 
+        to track which parts of the video you've watched. Every 10 seconds, it sends these ranges to the 
+        analytics endpoint at <code>https://videostats.tsmithcreative.workers.dev</code>. Try seeking around 
+        the video and watch the progress bar update!
+    </div>
+
+    <script src="https://embed.cloudflarestream.com/embed/sdk.latest.js"></script>
+    <script>
+        // Configuration
+        const ANALYTICS_ENDPOINT = 'https://videostats.tsmithcreative.workers.dev';
+        const VIDEO_ID = 'stream-demo-' + Date.now(); // Unique ID for this session
+        const FLUSH_INTERVAL = 10000; // Send data every 10 seconds
+
+        // Initialize Stream Player
+        const player = Stream(document.getElementById('stream-player'));
+        const watchedBar = document.getElementById('watched');
+        
+        let flushCount = 0;
+        let lastSentRanges = [];
+
+        // Update visualization and stats on every timeupdate
+        player.addEventListener('timeupdate', () => {
+            updateWatchedBar();
+        });
+
+        function updateWatchedBar() {
+            // Clear existing visualization
+            watchedBar.innerHTML = '';
+
+            // Loop through all played ranges
+            for (let i = 0; i < player.played.length; i++) {
+                const block = document.createElement('div');
+                
+                // Calculate position as percentage of video duration
+                const startPercent = (player.played.start(i) / player.duration) * 100;
+                const endPercent = (player.played.end(i) / player.duration) * 100;
+                
+                block.style.left = `${startPercent}%`;
+                block.style.right = `${100 - endPercent}%`;
+                
+                watchedBar.appendChild(block);
+            }
+
+            // Update range count
+            document.getElementById('rangeCount').textContent = player.played.length;
+        }
+
+        // Extract ranges from player for analytics
+        function extractRanges() {
+            const ranges = [];
+            
+            for (let i = 0; i < player.played.length; i++) {
+                ranges.push({
+                    startTime: player.played.start(i),
+                    endTime: player.played.end(i)
+                });
+            }
+            
+            return ranges;
+        }
+
+        // Send ranges to analytics endpoint
+        async function sendToAnalytics() {
+            const ranges = extractRanges();
+            
+            // Don't send if nothing has changed
+            if (ranges.length === 0 || JSON.stringify(ranges) === JSON.stringify(lastSentRanges)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${ANALYTICS_ENDPOINT}/api/track`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        videoId: VIDEO_ID,
+                        ranges: ranges
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to track views');
+                }
+
+                // Update stats
+                flushCount++;
+                lastSentRanges = ranges;
+                
+                document.getElementById('flushCount').textContent = flushCount;
+                document.getElementById('bucketCount').textContent = data.bucketsUpdated;
+                
+                showStatus(`✓ Sent ${ranges.length} ranges, updated ${data.bucketsUpdated} buckets`);
+
+            } catch (error) {
+                showStatus(`✗ Error: ${error.message}`, 'error');
+                console.error('Analytics error:', error);
+            }
+        }
+
+        // Show status messages
+        function showStatus(message, type = 'success') {
+            const container = document.getElementById('statusContainer');
+            const status = document.createElement('div');
+            status.className = `status ${type}`;
+            status.textContent = message;
+            container.appendChild(status);
+            
+            // Remove after 5 seconds
+            setTimeout(() => status.remove(), 5000);
+        }
+
+        // Periodically send data to analytics
+        setInterval(sendToAnalytics, FLUSH_INTERVAL);
+
+        // Send remaining data when page unloads
+        window.addEventListener('beforeunload', () => {
+            const ranges = extractRanges();
+            if (ranges.length > 0) {
+                // Use sendBeacon for reliable unload tracking
+                navigator.sendBeacon(
+                    `${ANALYTICS_ENDPOINT}/api/track`,
+                    JSON.stringify({ videoId: VIDEO_ID, ranges })
+                );
+            }
+        });
+
+        // Show initial message
+        player.addEventListener('loadedmetadata', () => {
+            showStatus('Analytics tracking started. Play the video to begin!');
+        });
+    </script>
+</body>
+</html>

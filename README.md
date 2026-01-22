@@ -210,6 +210,41 @@ player.on('timeupdate', (currentTime) => {
 window.addEventListener('beforeunload', () => tracker.flush());
 ```
 
+### Cloudflare Stream Player Integration
+
+If you're using Cloudflare Stream, you can leverage the built-in `played` TimeRanges API:
+
+```javascript
+// Initialize Stream Player
+const player = Stream(document.getElementById('stream-player'));
+
+// Extract ranges from player
+function extractRanges() {
+    const ranges = [];
+    for (let i = 0; i < player.played.length; i++) {
+        ranges.push({
+            startTime: player.played.start(i),
+            endTime: player.played.end(i)
+        });
+    }
+    return ranges;
+}
+
+// Send to analytics every 10 seconds
+setInterval(async () => {
+    const ranges = extractRanges();
+    if (ranges.length > 0) {
+        await fetch('/api/track', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ videoId: 'video_123', ranges })
+        });
+    }
+}, 10000);
+```
+
+See `examples/stream-player-simple.html` for a complete working demo with Cloudflare Stream.
+
 ## Performance Characteristics
 
 ### Write Performance
@@ -267,6 +302,21 @@ npm run dev
 # Type checking
 npm run type-check
 ```
+
+## Examples
+
+The `examples/` directory contains working demonstrations:
+
+### Interactive Demos
+- **`client.html`** - Full-featured demo with manual video player, range tracking, and visualization
+- **`stream-player-simple.html`** - Cloudflare Stream Player integration (simple, production-ready)
+- **`stream-player-integration.html`** - Advanced Stream Player demo with detailed statistics
+- **`visualize.html`** - Analytics dashboard with Chart.js histograms and retention charts
+
+### Testing
+- **`test-api.sh`** - Command-line API testing script with 8 test cases
+
+To use the Stream Player examples, simply open them in a browser. They connect to the deployed Worker at `https://videostats.tsmithcreative.workers.dev` and demonstrate real-time analytics tracking.
 
 ## Future Enhancements
 
