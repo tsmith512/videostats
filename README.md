@@ -30,11 +30,11 @@ CREATE TABLE video_watch_buckets (
 
 CREATE INDEX idx_video_id ON video_watch_buckets(video_id);
 
--- Optional: Video metadata table
+-- Video metadata table
 CREATE TABLE videos (
     video_id TEXT PRIMARY KEY,
-    duration INTEGER NOT NULL,      -- Total duration in seconds
-    total_views INTEGER DEFAULT 0,
+    duration INTEGER,               -- Total duration in seconds (nullable until known)
+    total_views INTEGER DEFAULT 0,  -- Counts viewing sessions
     created_at INTEGER,
     updated_at INTEGER
 );
@@ -77,6 +77,8 @@ CREATE TABLE videos (
 - Handles seeking and scrubbing behavior
 - Deduplicates overlapping bucket updates
 - Validates input ranges (non-negative, valid ordering)
+- Automatically tracks viewing sessions in the `videos` table
+- Increments `total_views` counter for each track request
 
 ### Get Video Histogram
 

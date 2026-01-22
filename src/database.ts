@@ -75,20 +75,35 @@ export async function getTotalViews(
 
 /**
  * Create or update video metadata
+ * Increments total_views on each call (tracks viewing sessions)
  */
-export async function upsertVideoMetadata(
+export async function trackVideoView(
+  db: D1Database,
+  videoId: string
+): Promise<void> {
+  await db.prepare(`
+    INSERT INTO videos (video_id, duration, total_views, created_at, updated_at)
+    VALUES (?, NULL, 1, unixepoch(), unixepoch())
+    ON CONFLICT(video_id) 
+    DO UPDATE SET 
+      total_views = total_views + 1,
+      updated_at = unixepoch()
+  `).bind(videoId).run();
+}
+
+/**
+ * Update video duration (called separately when duration is known)
+ */
+export async function updateVideoDuration(
   db: D1Database,
   videoId: string,
   duration: number
 ): Promise<void> {
   await db.prepare(`
-    INSERT INTO videos (video_id, duration, total_views, created_at, updated_at)
-    VALUES (?, ?, 0, unixepoch(), unixepoch())
-    ON CONFLICT(video_id) 
-    DO UPDATE SET 
-      duration = ?,
-      updated_at = unixepoch()
-  `).bind(videoId, duration, duration).run();
+    UPDATE videos 
+    SET duration = ?, updated_at = unixepoch()
+    WHERE video_id = ?
+  `).bind(duration, videoId).run();
 }
 
 /**

@@ -4,7 +4,7 @@
 import { Env, TrackRequest, TrackResponse, HistogramResponse, ErrorResponse } from './types';
 import { validateTrackRequest, validateVideoId, ValidationError } from './validation';
 import { aggregateRangesToBuckets } from './buckets';
-import { updateBuckets, getHistogram } from './database';
+import { updateBuckets, getHistogram, trackVideoView } from './database';
 
 /**
  * Main Worker export
@@ -79,12 +79,11 @@ async function handleTrack(
     // Aggregate ranges into bucket updates
     const bucketUpdates = aggregateRangesToBuckets(trackRequest.ranges);
 
-    // Update database
-    const bucketsUpdated = await updateBuckets(
-      env.DB,
-      trackRequest.videoId,
-      bucketUpdates
-    );
+    // Update database - batch both operations
+    const [bucketsUpdated] = await Promise.all([
+      updateBuckets(env.DB, trackRequest.videoId, bucketUpdates),
+      trackVideoView(env.DB, trackRequest.videoId)
+    ]);
 
     const response: TrackResponse = {
       bucketsUpdated

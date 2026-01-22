@@ -1,5 +1,26 @@
 # Deployment History
 
+## Update: Session Tracking - January 21, 2026
+
+**Version ID:** aa97c0b0-dacf-4a7f-991d-6d48e935130c
+
+### Changes
+- Added automatic session tracking to `videos` table
+- Track endpoint now creates/updates video records on each request
+- `total_views` increments for each viewing session
+- Made `duration` column nullable (will be populated from hosting provider later)
+- New migration: `0002_make_duration_nullable.sql`
+
+### Database Updates
+- **Migrations Applied:** 
+  - 0001_initial_schema.sql ✅
+  - 0002_make_duration_nullable.sql ✅
+
+### Bundle Size
+- **Size:** 7.86 KiB (2.25 KiB gzipped)
+
+---
+
 ## Production Deployment - January 21, 2026
 
 **First Deployment** 🚀
