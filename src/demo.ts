@@ -94,6 +94,32 @@ export function getDemoPage(videoId: string, workerUrl: string): string {
             transition: all 0.3s ease;
         }
         
+        #histogram {
+            position: relative;
+            background: #e9ecef;
+            height: 40px;
+            width: 100%;
+            margin: 20px 0;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+        }
+        
+        #histogram div {
+            flex: 1;
+            transition: all 0.3s ease;
+            border-right: 1px solid rgba(255,255,255,0.3);
+        }
+        
+        #histogram div:last-child {
+            border-right: none;
+        }
+        
+        #histogram div:hover {
+            opacity: 0.8;
+            cursor: pointer;
+        }
+        
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -224,8 +250,14 @@ export function getDemoPage(videoId: string, workerUrl: string): string {
             </div>
 
             <div class="stats-section">
-                <h3 class="section-title">Watched Progress</h3>
+                <h3 class="section-title">Your Session Progress</h3>
                 <div id="watched"></div>
+                
+                <h3 class="section-title">Global Heatmap (All Viewers)</h3>
+                <div id="histogram"></div>
+                <p style="font-size: 0.9em; color: #666; margin-top: 10px;">
+                    Each segment shows popularity across all viewing sessions. Darker colors = more views.
+                </p>
 
                 <div class="stats-grid">
                     <div class="stat-card">
@@ -274,16 +306,22 @@ export function getDemoPage(videoId: string, workerUrl: string): string {
 
         const player = Stream(document.getElementById('stream-player'));
         const watchedBar = document.getElementById('watched');
+        const histogramBar = document.getElementById('histogram');
         
         let hasSentData = false;
+        let videoDuration = 0;
 
         player.addEventListener('timeupdate', () => {
             updateWatchedBar();
         });
 
         player.addEventListener('loadedmetadata', () => {
+            videoDuration = player.duration;
             showStatus('✓ Stream Player loaded successfully', 'success');
             showStatus('📊 Analytics will be sent when video ends or page closes', 'info');
+            
+            // Load histogram data
+            loadHistogram();
         });
 
         // Send data when video ends
@@ -363,6 +401,9 @@ export function getDemoPage(videoId: string, workerUrl: string): string {
                 document.getElementById('bucketCount').textContent = data.bucketsUpdated;
                 
                 showStatus(\`✓ Sent \${ranges.length} ranges, updated \${data.bucketsUpdated} buckets\`, 'success');
+                
+                // Reload histogram to show updated data
+                setTimeout(loadHistogram, 1000);
 
             } catch (error) {
                 showStatus(\`✗ Error: \${error.message}\`, 'error');
@@ -380,6 +421,67 @@ export function getDemoPage(videoId: string, workerUrl: string): string {
             
             if (container.children.length > 5) {
                 container.removeChild(container.lastChild);
+            }
+        }
+
+        // Load and display histogram data
+        async function loadHistogram() {
+            try {
+                const response = await fetch(\`\${ANALYTICS_ENDPOINT}/api/histogram/\${VIDEO_ID}\`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    console.log('No histogram data yet');
+                    return;
+                }
+
+                if (!data.buckets || data.buckets.length === 0) {
+                    return;
+                }
+
+                displayHistogram(data.buckets);
+                
+                // Refresh histogram every 30 seconds
+                setTimeout(loadHistogram, 30000);
+
+            } catch (error) {
+                console.error('Error loading histogram:', error);
+            }
+        }
+
+        function displayHistogram(buckets) {
+            histogramBar.innerHTML = '';
+
+            if (buckets.length === 0 || videoDuration === 0) {
+                return;
+            }
+
+            // Find max view count for color scaling
+            const maxViews = Math.max(...buckets.map(b => b.viewCount));
+
+            // Create a segment for each 5-second bucket
+            const totalBuckets = Math.ceil(videoDuration / 5);
+            
+            for (let i = 0; i < totalBuckets; i++) {
+                const bucketStart = i * 5;
+                const bucket = buckets.find(b => b.bucketStart === bucketStart);
+                const viewCount = bucket ? bucket.viewCount : 0;
+                
+                const segment = document.createElement('div');
+                
+                // Color intensity based on view count
+                if (viewCount > 0) {
+                    const intensity = viewCount / maxViews;
+                    const hue = 260; // Purple hue
+                    const saturation = 70;
+                    const lightness = 85 - (intensity * 50); // Darker = more views
+                    segment.style.backgroundColor = \`hsl(\${hue}, \${saturation}%, \${lightness}%)\`;
+                    segment.title = \`\${bucketStart}s-\${bucketStart + 5}s: \${viewCount} views\`;
+                } else {
+                    segment.style.backgroundColor = '#e9ecef';
+                }
+                
+                histogramBar.appendChild(segment);
             }
         }
 
