@@ -40,9 +40,11 @@ export default {
         return await handleGetHistogram(videoId, env, corsHeaders);
       }
 
-      // Route: GET /demo - Live demo page
-      if (path === '/demo' && request.method === 'GET') {
-        const videoId = '849eebd185f7fd262589c09111911347';
+      // Route: GET /demo/:videoId - Live demo page with specific video
+      const demoMatch = path.match(/^\/demo(?:\/([^/]+))?$/);
+      if (demoMatch && request.method === 'GET') {
+        // Use video ID from URL or default to example video
+        const videoId = demoMatch[1] || '849eebd185f7fd262589c09111911347';
         const workerUrl = url.origin;
         const html = getDemoPage(videoId, workerUrl);
         
@@ -62,7 +64,8 @@ export default {
           endpoints: {
             track: 'POST /api/track',
             histogram: 'GET /api/histogram/:videoId',
-            demo: 'GET /demo'
+            demo: 'GET /demo (default video)',
+            demoWithVideo: 'GET /demo/:videoId (custom video)'
           }
         }), {
           headers: { 'Content-Type': 'application/json', ...corsHeaders }
