@@ -1,5 +1,24 @@
 # Deployment History
 
+## Update: Live Demo Page - January 21, 2026
+
+**Version ID:** 50bc3e8b-f416-48af-9653-ac90043f3231
+
+### Changes
+- Added `/demo` route serving embedded demo page
+- Demo features Cloudflare Stream Player with video 849eebd185f7fd262589c09111911347
+- Real-time analytics tracking with visual progress bar
+- Beautiful gradient UI with live statistics
+- Activity log showing tracking events
+- Automatic 10-second flush interval
+
+### Bundle Size
+- **Size:** 20.13 KiB (5.31 KiB gzipped)
+
+**Try it:** https://videostats.tsmithcreative.workers.dev/demo
+
+---
+
 ## Update: Session Tracking - January 21, 2026
 
 **Version ID:** aa97c0b0-dacf-4a7f-991d-6d48e935130c

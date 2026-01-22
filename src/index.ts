@@ -5,6 +5,7 @@ import { Env, TrackRequest, TrackResponse, HistogramResponse, ErrorResponse } fr
 import { validateTrackRequest, validateVideoId, ValidationError } from './validation';
 import { aggregateRangesToBuckets } from './buckets';
 import { updateBuckets, getHistogram, trackVideoView } from './database';
+import { getDemoPage } from './demo';
 
 /**
  * Main Worker export
@@ -39,6 +40,20 @@ export default {
         return await handleGetHistogram(videoId, env, corsHeaders);
       }
 
+      // Route: GET /demo - Live demo page
+      if (path === '/demo' && request.method === 'GET') {
+        const videoId = '849eebd185f7fd262589c09111911347';
+        const workerUrl = url.origin;
+        const html = getDemoPage(videoId, workerUrl);
+        
+        return new Response(html, {
+          headers: { 
+            'Content-Type': 'text/html',
+            ...corsHeaders 
+          }
+        });
+      }
+
       // Route: GET / - Health check / Info
       if (path === '/' && request.method === 'GET') {
         return new Response(JSON.stringify({
@@ -46,7 +61,8 @@ export default {
           version: '1.0.0',
           endpoints: {
             track: 'POST /api/track',
-            histogram: 'GET /api/histogram/:videoId'
+            histogram: 'GET /api/histogram/:videoId',
+            demo: 'GET /demo'
           }
         }), {
           headers: { 'Content-Type': 'application/json', ...corsHeaders }

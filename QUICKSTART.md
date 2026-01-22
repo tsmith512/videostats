@@ -44,6 +44,9 @@ curl -X POST http://localhost:8787/api/track \
 
 # Get histogram
 curl http://localhost:8787/api/histogram/test-123
+
+# Or visit the live demo in your browser
+open http://localhost:8787/demo
 ```
 
 ## Test with Browser
@@ -60,6 +63,12 @@ curl http://localhost:8787/api/histogram/test-123
 3. Click "Load Data" to see charts and statistics
 
 ## API Endpoints
+
+### Live Demo
+```bash
+GET /demo
+```
+Visit in browser to see a working example with embedded video player.
 
 ### Track Views
 ```bash

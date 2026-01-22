@@ -49,6 +49,19 @@ CREATE TABLE videos (
 
 ## API Design
 
+### Live Demo
+
+**Endpoint:** `GET /demo`
+
+Visit the live demo to see the analytics system in action with an embedded Cloudflare Stream video. The demo automatically tracks viewing patterns and displays real-time statistics.
+
+**Features:**
+- Embedded Cloudflare Stream Player
+- Real-time progress visualization
+- Live statistics (segments, coverage, uploads, buckets)
+- Activity log showing tracking events
+- Beautiful gradient UI
+
 ### Track Video Views
 
 **Endpoint:** `POST /api/track`
