@@ -104,6 +104,15 @@ async function handleTrack(
       trackVideoView(env.DB, trackRequest.videoId)
     ]);
 
+    // Log structured data for observability
+    console.log(JSON.stringify({
+      event: 'track_request',
+      videoId: trackRequest.videoId,
+      rangeCount: trackRequest.ranges.length,
+      bucketsUpdated,
+      timestamp: Date.now()
+    }));
+
     const response: TrackResponse = {
       bucketsUpdated
     };
